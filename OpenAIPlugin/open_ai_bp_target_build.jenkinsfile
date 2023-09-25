@@ -1,0 +1,91 @@
+def ColorFromBuildResult(result){
+    if("${result}" == 'SUCCESS') return '#18A558'
+    if("${result}" == 'ABORTED') return '#6e6e6e'
+    if("${result}" == 'UNSTABLE') return '#fcba03'
+    return '#FF0000'
+}
+
+pipeline {
+    agent {
+        node {
+            label ""
+            customWorkspace "$BUILD_DIR"
+        }
+    }
+
+    /* environment {
+        BUILD_DIR = 'c:\\Project\\Project-pipeline'
+        GIT_URL_GAME = 'https://github.com/account/project'
+        GIT_CREDENTIALS_GAME = 'credentials-id'
+        GIT_BRANCH_GAME = 'master'
+        GIT_CLONE_TIMEOUT_MIN = 60
+        UAT_PATH = 'C:\\Epic Games\\UE Binary\\UE_5.3\\Engine\\Build\\BatchFiles\\RunUAT.bat'
+        PROJECT_PATH = "$BUILD_DIR\\ProjectName.uproject"
+        ARCHIVE_PATH = "c:\\JenkinsJobs\\Artifacts\\$JOB_NAME\\$BUILD_NUMBER"
+        BUILD_FLAGS = '-build -cook -package -stage -archive -pak -allmaps'
+        SLACK_CHANNEL = 'project-channel'
+        PLATFORM = 'Win64'
+        CONFIG = 'Development'
+        OPEN_AI_AUTH_SRC = 'c:\\JenkinsJobs\\OpenAIAuth.ini'
+        OPEN_AI_AUTH_DEST = 'c:\\JenkinsJobs\\Project-pipeline\\Build\\Windows\\ProjectName'
+        PLUGIN_ARCHIVE_BINARIES = "c:\\JenkinsJobs\\Artifacts\\PluginBin"
+        PLUGIN_BINARIES_DIR = 'Plugins\\ProjectName\\Binaries'
+    }*/
+
+    stages {
+        stage('Git clone') {
+            steps {
+                slackSend channel: "$SLACK_CHANNEL",
+                    color: "$currentBuild.previousBuild" == 'null' ? '#18A558' :
+                    ColorFromBuildResult("$currentBuild.previousBuild.result"),
+                    message:"Build started: ${env.JOB_NAME} #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)"
+
+                checkout([$class: 'GitSCM',
+                    branches: [[name: "$GIT_BRANCH_GAME"]],
+                    extensions: [
+                        [$class: 'CleanBeforeCheckout'],
+                        [$class: 'CloneOption', timeout: "$GIT_CLONE_TIMEOUT_MIN"],
+                        [$class: 'CheckoutOption', timeout: "$GIT_CLONE_TIMEOUT_MIN"],
+                        [$class: 'SubmoduleOption', recursiveSubmodules: true]
+                    ],
+                    userRemoteConfigs: [[credentialsId: "$GIT_CREDENTIALS_GAME",
+                    url: "$GIT_URL_GAME"]]])
+            }
+        }
+        stage('Copy plugin binaries') {
+            steps {
+                bat '''
+                    xcopy "%PLUGIN_ARCHIVE_BINARIES%" "%BUILD_DIR%\\%PLUGIN_BINARIES_DIR%"  /E /I /Y
+                '''
+            }
+        }
+        stage('Build') {
+            steps {
+                bat '''
+                    "%UAT_PATH%" BuildCookRun ^
+                    -project="%PROJECT_PATH%" ^
+                    -platform="%PLATFORM%" ^
+                    -clientconfig="%CONFIG%" ^
+                    -serverconfig="%CONFIG%" ^
+                    -archivedirectory="%ARCHIVE_PATH%" ^
+                    %BUILD_FLAGS% -noturnkeyvariables
+                '''
+            }
+        }
+        stage('Copy OpenAI auth') {
+            steps {
+                bat '''
+                    xcopy "%OPEN_AI_AUTH_SRC%" "%OPEN_AI_AUTH_DEST%" /y
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            slackSend channel: "$SLACK_CHANNEL",
+                color: ColorFromBuildResult("$currentBuild.currentResult"),
+                message:"Build $currentBuild.currentResult: ${env.JOB_NAME} #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)"
+        }
+    }
+}

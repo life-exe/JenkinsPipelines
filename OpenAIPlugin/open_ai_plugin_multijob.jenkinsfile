@@ -1,0 +1,88 @@
+def ColorFromBuildResult(result){
+    if("${result}" == 'SUCCESS') return '#18A558'
+    if("${result}" == 'ABORTED') return '#6e6e6e'
+    if("${result}" == 'UNSTABLE') return '#fcba03'
+    return '#FF0000'
+}
+
+pipeline {
+    agent none
+
+    /* environment {
+        SLACK_CHANNEL = 'project-channel'
+        TEST_JOB_NAME = 'plugin-test-runner-pipeline'
+        CPP_JOB_NAME = 'plugin-cpp-build-pipeline'
+        CPP_JOB_BUILD_DIR = 'c:\\JenkinsJobs\\plugin-cpp-build-pipeline'
+        ARCHIVE_PATH = 'c:\\JenkinsJobs\\Artifacts\\PluginBinaries'
+        BP_JOB_NAME = 'OpenAI-plugin-bp-build-pipeline'
+        DOCS_JOB_NAME = 'plugin-docs-pipeline'
+        PLUGIN_BINARIES = 'Plugins\\ProjectName\\Binaries'
+        PLUGIN_PACKAGE_JOB_NAME = 'plugin-package-pipeline'
+    }*/
+    stages {
+       stage('Test') {
+            steps {
+                slackSend channel: "$SLACK_CHANNEL",
+                    color: "$currentBuild.previousBuild" == 'null' ? '#18A558' :
+                    ColorFromBuildResult("$currentBuild.previousBuild.result"),
+                    message:"Build started: ${env.JOB_NAME} #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)"
+
+                build job: "$TEST_JOB_NAME"
+            }
+        }
+        stage('Project build and package') {
+            matrix {
+                agent {
+                    node {
+                        label "master"
+                    }
+                }
+
+                axes {
+                    axis {
+                        name 'CONFIG'
+                        values 'Development', 'Shipping'
+                    }
+                }
+
+                stages {
+                    stage('Package cpp game with a plugin') {
+                        steps {
+                            build job: "$CPP_JOB_NAME", parameters: [string(name: 'CONFIG', value: "$CONFIG"), string(name: 'BUILD_DIR', value: "$CPP_JOB_BUILD_DIR")]
+                        }
+                    }
+                     stage('Archive plugin binaries') {
+                        steps {
+                            bat '''
+                                xcopy "%CPP_JOB_BUILD_DIR%\\%PLUGIN_BINARIES%" "%ARCHIVE_PATH%\\%CONFIG%" /E /I /Y
+                            '''
+                        }
+                    }
+                    stage('Package bp game with a plugin') {
+                        steps {
+                            build job: "$BP_JOB_NAME", parameters: [string(name: 'CONFIG', value: "$CONFIG"), string(name: 'PLUGIN_BINARIES_PATH', value: "$CPP_JOB_BUILD_DIR\\$PLUGIN_BINARIES")]
+                        }
+                    }
+                }
+            }
+        }
+        stage('Generate docs') {
+            steps {
+                build job: "$DOCS_JOB_NAME"
+            }
+        }
+        stage('Plugin package') {
+            steps {
+                build job: "$PLUGIN_PACKAGE_JOB_NAME"
+            }
+        }
+    }
+
+    post {
+        always {
+            slackSend channel: "$SLACK_CHANNEL",
+                color: ColorFromBuildResult("$currentBuild.currentResult"),
+                message:"Build $currentBuild.currentResult: ${env.JOB_NAME} #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)"
+        }
+    }
+}
