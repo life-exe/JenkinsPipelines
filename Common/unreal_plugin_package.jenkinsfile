@@ -52,6 +52,21 @@ pipeline {
                 '''
             }
         }
+        stage('Update plugin descriptor & zip') {
+            environment {
+                UPDATER_PATH="$BUILD_DIR\\plugin_descriptor_updater.py"
+            }
+            steps {
+                script {
+                    def UPDATER_URL = 'https://raw.githubusercontent.com/life-exe/JenkinsPipelines/master/Common/plugin_descriptor_updater.py'
+                    powershell "Invoke-WebRequest -OutFile ${UPDATER_PATH} -Uri ${UPDATER_URL}"
+                }
+                bat '''
+                    "%UPDATER_PATH%" "%PACKAGE_PATH%\\%PLUGIN_NAME%.uplugin"
+                '''
+                zip defaultExcludes: false, dir: "$PACKAGE_PATH", zipFile: "${PACKAGE_PATH}.zip"
+            }
+        }
     }
 
     post {
