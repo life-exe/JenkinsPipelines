@@ -46,7 +46,7 @@ pipeline {
                         [$class: 'CleanBeforeCheckout'],
                         [$class: 'CloneOption', timeout: "$GIT_CLONE_TIMEOUT_MIN"],
                         [$class: 'CheckoutOption', timeout: "$GIT_CLONE_TIMEOUT_MIN"],
-                        [$class: 'SubmoduleOption', recursiveSubmodules: true]
+                        [$class: 'SubmoduleOption', recursiveSubmodules: true, trackingSubmodules: true]
                     ],
                     userRemoteConfigs: [[credentialsId: "$GIT_CREDENTIALS_GAME",
                     url: "$GIT_URL_GAME"]]])

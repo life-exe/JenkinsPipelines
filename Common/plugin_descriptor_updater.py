@@ -6,7 +6,7 @@ def update_json_file(file_path):
     with open(file_path, 'r') as file:
         data = json.load(file)
 
-    # Update key that nesessera for blueprint packaging
+    # Update key for Blueprint Packaging
     data["EnabledByDefault"] = False
 
     # Write the updated JSON back to the file

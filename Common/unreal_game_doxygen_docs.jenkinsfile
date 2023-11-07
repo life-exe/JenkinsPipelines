@@ -39,7 +39,7 @@ pipeline {
                     branches: [[name: "$GIT_BRANCH_GAME"]],
                     extensions: [
                         [$class: 'CleanBeforeCheckout'],
-                        [$class: 'SubmoduleOption', disableSubmodules: false, recursiveSubmodules: true]
+                        [$class: 'SubmoduleOption', disableSubmodules: false, recursiveSubmodules: true, trackingSubmodules: true]
                     ],
                     userRemoteConfigs: [[credentialsId: "$GIT_CREDENTIALS_GAME",
                     url: "$GIT_URL_GAME"]]])

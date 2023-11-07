@@ -55,7 +55,7 @@ pipeline {
                     branches: [[name: "$GIT_BRANCH_GAME"]],
                     extensions: [
                         [$class: 'CleanBeforeCheckout'],
-                        [$class: 'SubmoduleOption', disableSubmodules: false, recursiveSubmodules: true],
+                        [$class: 'SubmoduleOption', disableSubmodules: false, recursiveSubmodules: true, trackingSubmodules: true],
                         [$class: 'CloneOption', timeout: "$GIT_CLONE_TIMEOUT_MIN"],
                         [$class: 'CheckoutOption', timeout: "$GIT_CLONE_TIMEOUT_MIN"]
                     ],
